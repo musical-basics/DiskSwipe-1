@@ -73,14 +73,24 @@ export async function executeActions(actions: {paths: string[], action: 'trash' 
       if (act.paths.length === 1) {
         try { await moveToTemp(act.paths[0]) } catch {}
       } else {
-        const month = new Date().toLocaleString('default', { month: 'short' })
-        const year = new Date().getFullYear()
-        const folderName = `Organized_Bundle_${month}${year}_${Date.now()}`
-        const destFolder = path.join(os.homedir(), 'Desktop', folderName)
-        await fs.mkdir(destFolder, { recursive: true }).catch(() => {})
+        const timestamp = Date.now()
+        const destRoot = path.join(os.homedir(), 'Desktop', `Organized_Bundle_${timestamp}`)
+        
         for (const p of act.paths) {
-          const dest = path.join(destFolder, path.basename(p))
-          try { await fs.rename(p, dest) } catch {}
+          try {
+            const stat = await fs.stat(p)
+            const mtime = new Date(stat.mtimeMs)
+            const yearStr = mtime.getFullYear().toString()
+            const monthStr = mtime.toLocaleString('default', { month: 'short' })
+            
+            const specificDestFolder = path.join(destRoot, yearStr, monthStr)
+            await fs.mkdir(specificDestFolder, { recursive: true }).catch(() => {})
+            
+            const destPath = path.join(specificDestFolder, path.basename(p))
+            await fs.rename(p, destPath)
+          } catch {
+            // ignore 
+          }
         }
       }
     } else if (act.action === 'keep') {
