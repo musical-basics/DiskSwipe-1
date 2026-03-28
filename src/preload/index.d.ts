@@ -13,7 +13,8 @@ declare global {
     electron: ElectronAPI
     api: {
       checkPermissions: () => Promise<boolean>
-      startScan: () => Promise<ScannedFile[]>
+      startScan: (directories: string[]) => Promise<any[]>
+      executeActions: (actions: {path: string, action: string}[]) => Promise<void>
       whitelistFile: (path: string) => Promise<void>
       snoozeFile: (path: string) => Promise<void>
       moveToTrash: (path: string) => Promise<void>

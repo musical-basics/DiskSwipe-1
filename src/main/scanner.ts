@@ -89,6 +89,24 @@ export async function moveToTemp(filePath: string) {
   })
 }
 
+export async function executeActions(actions: {path: string, action: 'trash' | 'temp' | 'snooze' | 'keep'}[]) {
+  await loadData()
+  for (const act of actions) {
+    if (act.action === 'trash') {
+      try { await shell.trashItem(act.path) } catch {}
+    } else if (act.action === 'temp') {
+      try { await moveToTemp(act.path) } catch {}
+    } else if (act.action === 'keep') {
+      whitelistSet.add(act.path)
+    } else if (act.action === 'snooze') {
+      snoozeMap.set(act.path, Date.now() + 7 * 24 * 60 * 60 * 1000)
+    }
+  }
+  await fs.writeFile(whitelistPath, JSON.stringify(Array.from(whitelistSet), null, 2))
+  const obj = Object.fromEntries(snoozeMap)
+  await fs.writeFile(snoozePath, JSON.stringify(obj, null, 2))
+}
+
 function isSnoozed(filePath: string): boolean {
   if (!snoozeMap.has(filePath)) return false
   const time = snoozeMap.get(filePath)!
@@ -131,14 +149,11 @@ async function scanDirectory(dir: string, files: ScannedFile[]) {
   }
 }
 
-export async function startScan(): Promise<ScannedFile[]> {
+export async function startScan(directories: string[]): Promise<ScannedFile[]> {
   await ensureFiles()
   const files: ScannedFile[] = []
-  const homedir = os.homedir()
-  const targets = [
-    path.join(homedir, 'Desktop'),
-    path.join(homedir, 'Downloads')
-  ]
+  
+  const targets = directories.map(dir => path.join(os.homedir(), dir))
 
   for (const target of targets) {
     await scanDirectory(target, files)

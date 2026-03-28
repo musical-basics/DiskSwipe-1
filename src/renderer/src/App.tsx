@@ -11,12 +11,21 @@ interface ScannedFile {
   modifyTime: number
 }
 
-type AppState = 'PERMISSIONS' | 'SCANNING' | 'CAROUSEL' | 'COMPLETE'
+type AppState = 'PERMISSIONS' | 'SCANNING' | 'CAROUSEL' | 'PROCESSING' | 'COMPLETE'
+
+type ActionType = 'trash' | 'temp' | 'snooze' | 'keep'
 
 export default function App() {
   const [appState, setAppState] = useState<AppState>('PERMISSIONS')
   const [files, setFiles] = useState<ScannedFile[]>([])
-  const [trashedSize, setTrashedSize] = useState(0)
+  const [history, setHistory] = useState<{file: ScannedFile, action: ActionType}[]>([])
+  const [selectedDirs, setSelectedDirs] = useState({
+    Downloads: true,
+    Desktop: true,
+    Documents: false,
+    Pictures: false,
+    Movies: false
+  })
   const swipeCardRef = useRef<SwipeCardRef>(null)
 
   useEffect(() => {
@@ -24,64 +33,71 @@ export default function App() {
   }, [])
 
   const checkInitialPermissions = async () => {
-    if (!window.api) {
-      alert("You are viewing the React dev server in a browser!\nSwipeSweep requires Electron Native APIs.\n\nPlease look for the Electron app window in your dock or run 'pnpm dev' again.")
-      return
-    }
-
-    const hasPermission = await window.api.checkPermissions()
-    if (hasPermission) {
-      startScanningProcess()
-    } else {
-      setAppState('PERMISSIONS')
+    const hasPerms = await window.api.checkPermissions()
+    if (hasPerms) {
+      // Don't auto-start scan, let them pick folders
     }
   }
 
-  const startScanningProcess = async () => {
+  const startScan = async () => {
     setAppState('SCANNING')
-    // A small buffer so the user actually sees the satisfying animation before it resolves
-    setTimeout(async () => {
-      const scanned = await window.api.startScan()
-      if (scanned.length > 0) {
-        setFiles(scanned)
-        setAppState('CAROUSEL')
-      } else {
-        setAppState('COMPLETE')
-      }
-    }, 1200)
-  }
-
-  const handleGrantPermission = async () => {
-    checkInitialPermissions()
+    const dirsToScan = Object.entries(selectedDirs).filter(([_, a]) => a).map(([d]) => d)
+    if (dirsToScan.length === 0) dirsToScan.push('Downloads')
+    const scannedFiles = await window.api.startScan(dirsToScan)
+    setFiles(scannedFiles)
+    if (scannedFiles.length > 0) {
+      setAppState('CAROUSEL')
+    } else {
+      setAppState('COMPLETE')
+    }
   }
 
   const handleNext = () => {
-    if (files.length <= 1) {
-      setAppState('COMPLETE')
-    } else {
-      setFiles(files.slice(1))
+    setFiles((prev) => {
+      const nextArr = prev.slice(1)
+      if (nextArr.length === 0) {
+        // We aren't fully complete until we commit, so show complete screen manually
+        setAppState('COMPLETE')
+      }
+      return nextArr
+    })
+  }
+
+  const trackSwipe = (file: ScannedFile, action: ActionType) => {
+    setHistory(prev => [...prev, { file, action }])
+    handleNext()
+  }
+
+  const handleSwipeLeft = (file: ScannedFile) => trackSwipe(file, 'trash')
+  const handleSwipeRight = (file: ScannedFile) => trackSwipe(file, 'snooze')
+  const handleKeep = (file: ScannedFile) => trackSwipe(file, 'keep')
+  const handleSwipeDown = (file: ScannedFile) => trackSwipe(file, 'temp')
+
+  const handleUndo = () => {
+    if (history.length === 0) return
+    const lastAction = history[history.length - 1]
+    setHistory(history.slice(0, -1))
+    setFiles([lastAction.file, ...files])
+  }
+
+  useEffect(() => {
+    if (appState !== 'CAROUSEL') return
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() === 'z' && (e.metaKey || e.ctrlKey)) {
+        handleUndo()
+      }
     }
-  }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [appState, history, files])
 
-  const handleSwipeLeft = async (file: ScannedFile) => {
-    await window.api.moveToTrash(file.path)
-    setTrashedSize(prev => prev + (file.size / 1024 / 1024 / 1024))
-    handleNext()
-  }
-
-  const handleSwipeRight = async (file: ScannedFile) => {
-    await window.api.snoozeFile(file.path)
-    handleNext()
-  }
-
-  const handleKeep = async (file: ScannedFile) => {
-    await window.api.whitelistFile(file.path)
-    handleNext()
-  }
-
-  const handleSwipeDown = async (file: ScannedFile) => {
-    await window.api.moveToTemp(file.path)
-    handleNext()
+  const commitActions = async () => {
+    setAppState('PROCESSING')
+    const acts = history.map(h => ({ path: h.file.path, action: h.action }))
+    await window.api.executeActions(acts)
+    setAppState('COMPLETE')
+    // Reset history so it doesn't double-commit
+    setHistory([])
   }
 
   return (
@@ -89,16 +105,31 @@ export default function App() {
       {appState === 'PERMISSIONS' && (
         <div className="text-center max-w-sm space-y-4">
           <ShieldAlert className="w-16 h-16 mx-auto text-yellow-500" />
-          <h1 className="text-2xl font-bold">Access Required</h1>
-          <p className="text-gray-400">
-            SwipeSweep needs permission to read your Desktop and Downloads folders to find heavy files.
-            Please grant "Files and Folders" or "Full Disk Access" in macOS System Settings.
+          <h1 className="text-3xl font-bold mb-4 tracking-tight">Disk Access Required</h1>
+          <p className="text-gray-400 mb-8 leading-relaxed">
+            SwipeSweep needs permission to safely analyze your home folders for massive files. No actions are executed until you finish.
           </p>
+          
+          <div className="w-full bg-gray-800/50 p-6 rounded-2xl mb-8 border border-gray-700/50 flex flex-col gap-4 text-left shadow-lg">
+            <h3 className="font-bold text-sm tracking-widest uppercase text-gray-400 mb-2">Target Folders</h3>
+            {Object.entries(selectedDirs).map(([dir, active]) => (
+              <label key={dir} className="flex items-center space-x-4 cursor-pointer hover:bg-white/5 p-2 rounded-lg transition-colors">
+                <input 
+                  type="checkbox" 
+                  checked={active}
+                  onChange={() => setSelectedDirs(prev => ({ ...prev, [dir]: !active }))}
+                  className="w-5 h-5 accent-blue-500 cursor-pointer" 
+                />
+                <span className="font-medium text-lg">{dir}</span>
+              </label>
+            ))}
+          </div>
+
           <button 
-            onClick={handleGrantPermission}
-            className="w-full py-3 bg-blue-600 hover:bg-blue-700 rounded-lg font-medium transition-colors"
+            onClick={startScan}
+            className="w-full py-4 bg-white text-black rounded-lg font-bold text-lg hover:scale-105 transition-transform cursor-pointer shadow-blue-500/20 shadow-2xl"
           >
-            I've Granted Access
+            Authenticate & Scan
           </button>
         </div>
       )}
@@ -110,7 +141,7 @@ export default function App() {
             <Search className="w-12 h-12 absolute inset-0 m-auto text-blue-400 animate-pulse" />
           </div>
           <h2 className="text-xl font-semibold">Hunting down heavy files...</h2>
-          <p className="text-gray-500 text-sm animate-pulse">Scanning ~/Desktop and ~/Downloads</p>
+          <p className="text-gray-500 text-sm animate-pulse">Scanning selected folders</p>
         </div>
       )}
 
@@ -121,6 +152,15 @@ export default function App() {
           </h2>
           
           <div className="w-full aspect-[3/4] relative perspective-1000">
+            {history.length > 0 && (
+              <button 
+                onClick={handleUndo} 
+                className="absolute -top-12 left-0 flex items-center bg-gray-800/80 border border-gray-700/50 hover:bg-gray-700 px-4 py-2 rounded-full cursor-pointer transition-colors shadow-lg z-20 text-blue-400 font-bold tracking-widest text-xs uppercase"
+              >
+                Undo (⌘Z)
+              </button>
+            )}
+
             {files[0] && (
               <SwipeCard 
                 ref={swipeCardRef}
@@ -167,31 +207,34 @@ export default function App() {
         </div>
       )}
 
+      {appState === 'PROCESSING' && (
+        <div className="flex flex-col items-center animate-pulse">
+          <Search className="w-16 h-16 text-blue-500 mb-6 animate-spin" />
+          <h2 className="text-2xl font-bold">Executing Moves...</h2>
+          <p className="text-gray-400 mt-2">Updating Trash & Archive</p>
+        </div>
+      )}
+
       {appState === 'COMPLETE' && (
-        <div className="text-center max-w-sm space-y-6">
-          <div className="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
-            <Trash2 className="w-10 h-10 text-green-500" />
+        <div className="flex flex-col items-center max-w-sm text-center">
+          <div className="w-24 h-24 bg-green-500/10 rounded-full flex items-center justify-center mb-8 border border-green-500/30">
+            <Trash2 className="w-12 h-12 text-green-400" />
           </div>
-          <h1 className="text-4xl font-black tracking-tight">Boom.</h1>
-          <p className="text-xl text-gray-300">
-            You just staged <span className="text-green-400 font-bold">{trashedSize.toFixed(2)} GB</span> for deletion.
-          </p>
+          <h1 className="text-5xl font-black mb-6 tracking-tight">Boom.</h1>
           
-          <div className="pt-8 space-y-3">
+          <div className="w-full bg-gray-800/50 p-6 rounded-2xl mb-8 border border-gray-700/50">
+            <p className="text-gray-400 mb-2 font-medium tracking-widest uppercase text-xs">Total Trashed</p>
+            <p className="text-4xl font-bold text-red-400">
+              {(history.filter(h => h.action === 'trash').reduce((acc, h) => acc + h.file.size, 0) / 1024 / 1024 / 1024).toFixed(2)} GB
+            </p>
+          </div>
+
+          <div className="flex justify-between w-full space-x-2">
             <button 
-              onClick={async () => {
-                await window.api.emptyTrash()
-                alert('macOS Trash successfully emptied!')
-              }}
-              className="w-full py-4 bg-red-600 hover:bg-red-700 rounded-xl font-bold transition-colors shadow-lg"
+              onClick={history.length > 0 ? commitActions : window.api.emptyTrash}
+              className="flex-1 py-4 bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500 hover:text-white rounded-lg font-bold text-sm tracking-widest uppercase transition-colors"
             >
-              Empty Trash Now
-            </button>
-            <button 
-              onClick={checkInitialPermissions}
-              className="w-full py-4 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl font-semibold transition-colors"
-            >
-              Scan Again
+              {history.length > 0 ? "Commit All Moves" : "Empty Mac Trash Now"}
             </button>
           </div>
         </div>
