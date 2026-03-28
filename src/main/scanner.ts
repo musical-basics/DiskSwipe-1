@@ -2,10 +2,13 @@ import { app, shell } from 'electron'
 import fs from 'fs/promises'
 import path from 'path'
 import os from 'os'
+import { exec } from 'child_process'
 
-export interface ScannedFile {
+export interface ScannedItem {
+  id: string
+  isBundle: boolean
   name: string
-  path: string
+  paths: string[]
   size: number
   type: string
   modifyTime: number
@@ -29,57 +32,27 @@ async function ensureFiles() {
 
   try {
     const sData = await fs.readFile(SNOOZE_PATH, 'utf-8')
-    const parsed = JSON.parse(sData)
-    snoozeMap = new Map(Object.entries(parsed))
+    snoozeMap = new Map(Object.entries(JSON.parse(sData)))
   } catch {
     snoozeMap = new Map()
   }
-}
-
-async function saveWhitelist() {
-  await fs.writeFile(WHITELIST_PATH, JSON.stringify(Array.from(whitelist)))
-}
-
-async function saveSnooze() {
-  const obj = Object.fromEntries(snoozeMap)
-  await fs.writeFile(SNOOZE_PATH, JSON.stringify(obj))
 }
 
 export async function checkPermissions(): Promise<boolean> {
   try {
     const desktop = path.join(os.homedir(), 'Desktop')
     const downloads = path.join(os.homedir(), 'Downloads')
-    
-    // Attempting to opendir on macOS acts as a strict permission check.
     const dirDesktop = await fs.opendir(desktop)
     await dirDesktop.close()
-    
     const dirDownloads = await fs.opendir(downloads)
     await dirDownloads.close()
-    
     return true
   } catch (err) {
     return false
   }
 }
 
-export async function whitelistFile(filePath: string) {
-  await ensureFiles()
-  whitelist.add(filePath)
-  await saveWhitelist()
-}
-
-export async function snoozeFile(filePath: string) {
-  await ensureFiles()
-  snoozeMap.set(filePath, Date.now())
-  await saveSnooze()
-}
-
-export async function moveToTrash(filePath: string) {
-  await shell.trashItem(filePath)
-}
-
-export async function moveToTemp(filePath: string) {
+async function moveToTemp(filePath: string) {
   const tempDir = path.join(os.homedir(), 'Documents', 'temp')
   await fs.mkdir(tempDir, { recursive: true }).catch(() => {})
   const dest = path.join(tempDir, path.basename(filePath))
@@ -89,17 +62,32 @@ export async function moveToTemp(filePath: string) {
   })
 }
 
-export async function executeActions(actions: {path: string, action: 'trash' | 'temp' | 'snooze' | 'keep'}[]) {
+export async function executeActions(actions: {paths: string[], action: 'trash' | 'temp' | 'snooze' | 'keep'}[]) {
   await ensureFiles()
   for (const act of actions) {
     if (act.action === 'trash') {
-      try { await shell.trashItem(act.path) } catch {}
+      for (const p of act.paths) {
+        try { await shell.trashItem(p) } catch {}
+      }
     } else if (act.action === 'temp') {
-      try { await moveToTemp(act.path) } catch {}
+      if (act.paths.length === 1) {
+        try { await moveToTemp(act.paths[0]) } catch {}
+      } else {
+        const month = new Date().toLocaleString('default', { month: 'short' })
+        const year = new Date().getFullYear()
+        const folderName = `Organized_Bundle_${month}${year}_${Date.now()}`
+        const destFolder = path.join(os.homedir(), 'Desktop', folderName)
+        await fs.mkdir(destFolder, { recursive: true }).catch(() => {})
+        for (const p of act.paths) {
+          const dest = path.join(destFolder, path.basename(p))
+          try { await fs.rename(p, dest) } catch {}
+        }
+      }
     } else if (act.action === 'keep') {
-      whitelist.add(act.path)
+      for (const p of act.paths) whitelist.add(p)
     } else if (act.action === 'snooze') {
-      snoozeMap.set(act.path, Date.now() + 7 * 24 * 60 * 60 * 1000)
+      const future = Date.now() + 7 * 24 * 60 * 60 * 1000
+      for (const p of act.paths) snoozeMap.set(p, future)
     }
   }
   await fs.writeFile(WHITELIST_PATH, JSON.stringify(Array.from(whitelist), null, 2))
@@ -114,15 +102,20 @@ function isSnoozed(filePath: string): boolean {
   return (Date.now() - time) < THIRTY_DAYS
 }
 
-async function scanDirectory(dir: string, files: ScannedFile[]) {
+interface RawFile {
+  name: string
+  path: string
+  size: number
+  type: string
+  modifyTime: number
+}
+
+async function scanDirectory(dir: string, files: RawFile[]) {
   try {
     const entries = await fs.readdir(dir, { withFileTypes: true })
     for (const entry of entries) {
       const fullPath = path.join(dir, entry.name)
-
-      // Filter out extremely deep nested folders or bundles
       if (entry.name.startsWith('.') || entry.name.endsWith('.app')) continue
-
       if (whitelist.has(fullPath) || isSnoozed(fullPath)) continue
 
       if (entry.isDirectory()) {
@@ -139,37 +132,81 @@ async function scanDirectory(dir: string, files: ScannedFile[]) {
               modifyTime: stats.mtimeMs
             })
           }
-        } catch (err) {
-          // ignore inaccessible
-        }
+        } catch {}
       }
     }
-  } catch (err) {
-    // ignore inaccessible 
-  }
+  } catch {}
 }
 
-export async function startScan(directories: string[]): Promise<ScannedFile[]> {
+export async function startScan(directories: string[], mode: 'heavy' | 'clutter'): Promise<ScannedItem[]> {
   await ensureFiles()
-  const files: ScannedFile[] = []
-  
+  const items: ScannedItem[] = []
   const targets = directories.map(dir => path.join(os.homedir(), dir))
 
-  for (const target of targets) {
-    await scanDirectory(target, files)
+  if (mode === 'heavy') {
+    const files: RawFile[] = []
+    for (const target of targets) {
+      await scanDirectory(target, files)
+    }
+    const sorted = files.sort((a, b) => b.size - a.size)
+    for (const f of sorted) {
+      items.push({
+        id: Buffer.from(f.path).toString('base64'),
+        isBundle: false,
+        name: f.name,
+        paths: [f.path],
+        size: f.size,
+        type: f.type,
+        modifyTime: f.modifyTime
+      })
+    }
+  } else {
+    for (const target of targets) {
+      try {
+        const dirents = await fs.readdir(target, { withFileTypes: true })
+        const grouped: Record<string, { paths: string[], size: number }> = {}
+        for (const dirent of dirents) {
+          if (dirent.isDirectory()) continue
+          const fullPath = path.join(target, dirent.name)
+          if (dirent.name.startsWith('.') || dirent.name.endsWith('.app')) continue
+          if (whitelist.has(fullPath) || isSnoozed(fullPath)) continue
+          
+          try {
+            const stat = await fs.stat(fullPath)
+            if (stat.size < 10 * 1024 * 1024) {  // < 10MB
+              const ext = path.extname(fullPath).toLowerCase().replace('.', '') || 'unknown'
+              if (!grouped[ext]) grouped[ext] = { paths: [], size: 0 }
+              grouped[ext].paths.push(fullPath)
+              grouped[ext].size += stat.size
+            }
+          } catch {}
+        }
+        for (const [ext, data] of Object.entries(grouped)) {
+          if (data.paths.length > 5) {
+            items.push({
+              id: `bundle-${Buffer.from(target).toString('base64')}-${ext}`,
+              isBundle: true,
+              name: `${data.paths.length} Loose ${ext.toUpperCase() || 'Files'}`,
+              paths: data.paths,
+              size: data.size,
+              type: `bundle-${ext}`,
+              modifyTime: Date.now()
+            })
+          }
+        }
+      } catch {}
+    }
+    items.sort((a, b) => b.size - a.size)
   }
 
-  return files.sort((a, b) => b.size - a.size)
+  return items
 }
-
-import { exec } from 'child_process'
 
 export function emptyTrash(): Promise<void> {
   return new Promise((resolve, reject) => {
     if (process.platform === 'darwin') {
       exec(`osascript -e 'tell application "Finder" to empty trash'`, (error) => {
         if (error) {
-          console.error(error)
           reject(error)
         } else {
           resolve()
@@ -180,4 +217,3 @@ export function emptyTrash(): Promise<void> {
     }
   })
 }
-

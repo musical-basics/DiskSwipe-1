@@ -2,23 +2,25 @@ import { useState, useEffect, useRef } from 'react'
 import { Search, Trash2, ShieldAlert, Sparkles, RefreshCw, Archive, Home } from 'lucide-react'
 import { SwipeCard, SwipeCardRef } from './components/SwipeCard'
 
-// Define the core file interface mapped from preload
-interface ScannedFile {
+export interface ScannedItem {
+  id: string
+  isBundle: boolean
   name: string
-  path: string
+  paths: string[]
   size: number
   type: string
   modifyTime: number
 }
 
 type AppState = 'PERMISSIONS' | 'SCANNING' | 'CAROUSEL' | 'PROCESSING' | 'COMPLETE'
-
 type ActionType = 'trash' | 'temp' | 'snooze' | 'keep'
+type ScanMode = 'heavy' | 'clutter'
 
 export default function App() {
   const [appState, setAppState] = useState<AppState>('PERMISSIONS')
-  const [files, setFiles] = useState<ScannedFile[]>([])
-  const [history, setHistory] = useState<{file: ScannedFile, action: ActionType}[]>([])
+  const [scanMode, setScanMode] = useState<ScanMode>('heavy')
+  const [files, setFiles] = useState<ScannedItem[]>([])
+  const [history, setHistory] = useState<{file: ScannedItem, action: ActionType}[]>([])
   const [selectedDirs, setSelectedDirs] = useState({
     Downloads: true,
     Desktop: true,
@@ -35,7 +37,7 @@ export default function App() {
   const checkInitialPermissions = async () => {
     const hasPerms = await window.api.checkPermissions()
     if (hasPerms) {
-      // Don't auto-start scan, let them pick folders
+      // Don't auto-start
     }
   }
 
@@ -43,9 +45,11 @@ export default function App() {
     setAppState('SCANNING')
     const dirsToScan = Object.entries(selectedDirs).filter(([_, a]) => a).map(([d]) => d)
     if (dirsToScan.length === 0) dirsToScan.push('Downloads')
-    const scannedFiles = await window.api.startScan(dirsToScan)
-    setFiles(scannedFiles)
-    if (scannedFiles.length > 0) {
+    
+    const scannedItems = await window.api.startScan(dirsToScan, scanMode)
+    setFiles(scannedItems)
+    
+    if (scannedItems.length > 0) {
       setAppState('CAROUSEL')
     } else {
       setAppState('COMPLETE')
@@ -55,23 +59,20 @@ export default function App() {
   const handleNext = () => {
     setFiles((prev) => {
       const nextArr = prev.slice(1)
-      if (nextArr.length === 0) {
-        // We aren't fully complete until we commit, so show complete screen manually
-        setAppState('COMPLETE')
-      }
+      if (nextArr.length === 0) setAppState('COMPLETE')
       return nextArr
     })
   }
 
-  const trackSwipe = (file: ScannedFile, action: ActionType) => {
+  const trackSwipe = (file: ScannedItem, action: ActionType) => {
     setHistory(prev => [...prev, { file, action }])
     handleNext()
   }
 
-  const handleSwipeLeft = (file: ScannedFile) => trackSwipe(file, 'trash')
-  const handleSwipeRight = (file: ScannedFile) => trackSwipe(file, 'snooze')
-  const handleKeep = (file: ScannedFile) => trackSwipe(file, 'keep')
-  const handleSwipeDown = (file: ScannedFile) => trackSwipe(file, 'temp')
+  const handleSwipeLeft = (file: ScannedItem) => trackSwipe(file, 'trash')
+  const handleSwipeRight = (file: ScannedItem) => trackSwipe(file, 'snooze')
+  const handleKeep = (file: ScannedItem) => trackSwipe(file, 'keep')
+  const handleSwipeDown = (file: ScannedItem) => trackSwipe(file, 'temp')
 
   const handleUndo = () => {
     if (history.length === 0) return
@@ -104,65 +105,87 @@ export default function App() {
 
   const commitActions = async () => {
     setAppState('PROCESSING')
-    const acts = history.map(h => ({ path: h.file.path, action: h.action }))
+    // Send the array of paths down
+    const acts = history.map(h => ({ paths: h.file.paths, action: h.action }))
     await window.api.executeActions(acts)
     setAppState('COMPLETE')
-    // Reset history so it doesn't double-commit
     setHistory([])
   }
 
-  return (
-    <div className="h-screen w-screen flex flex-col items-center justify-center p-6 space-y-6">
-      {appState === 'PERMISSIONS' && (
-        <div className="text-center max-w-sm space-y-4">
-          <ShieldAlert className="w-16 h-16 mx-auto text-yellow-500" />
-          <h1 className="text-3xl font-bold mb-4 tracking-tight">Disk Access Required</h1>
-          <p className="text-gray-400 mb-8 leading-relaxed">
-            SwipeSweep needs permission to safely analyze your home folders for massive files. No actions are executed until you finish.
-          </p>
-          
-          <div className="w-full bg-gray-800/50 p-6 rounded-2xl mb-8 border border-gray-700/50 flex flex-col gap-4 text-left shadow-lg">
-            <h3 className="font-bold text-sm tracking-widest uppercase text-gray-400 mb-2">Target Folders</h3>
-            {Object.entries(selectedDirs).map(([dir, active]) => (
-              <label key={dir} className="flex items-center space-x-4 cursor-pointer hover:bg-white/5 p-2 rounded-lg transition-colors">
-                <input 
-                  type="checkbox" 
-                  checked={active}
-                  onChange={() => setSelectedDirs(prev => ({ ...prev, [dir]: !active }))}
-                  className="w-5 h-5 accent-blue-500 cursor-pointer" 
-                />
-                <span className="font-medium text-lg">{dir}</span>
-              </label>
-            ))}
-          </div>
+  const currentFile = files[0]
 
-          <button 
-            onClick={startScan}
-            className="w-full py-4 bg-white text-black rounded-lg font-bold text-lg hover:scale-105 transition-transform cursor-pointer shadow-blue-500/20 shadow-2xl"
-          >
-            Authenticate & Scan
-          </button>
+  return (
+    <div className="w-screen h-screen bg-black text-white overflow-hidden flex flex-col font-sans select-none">
+      
+      {appState === 'PERMISSIONS' && (
+        <div className="flex-1 flex items-center justify-center p-8 bg-gradient-to-br from-gray-900 to-black">
+          <div className="text-center max-w-md w-full">
+            <ShieldAlert className="w-16 h-16 mx-auto text-blue-500 mb-6" />
+            <h1 className="text-3xl font-bold mb-4 tracking-tight">Disk Access Required</h1>
+            <p className="text-gray-400 mb-8 leading-relaxed text-sm">
+              SwipeSweep needs permission to safely analyze your home folders. No actions are executed until you finish.
+            </p>
+            
+            <div className="flex w-full space-x-2 mb-6">
+              <button 
+                onClick={() => setScanMode('heavy')}
+                className={`flex-1 py-4 px-2 rounded-xl font-bold text-sm transition-all border border-gray-700/50 ${scanMode === 'heavy' ? 'bg-blue-600 text-white shadow-[0_0_20px_rgba(37,99,235,0.3)]' : 'bg-gray-800/50 text-gray-500 hover:bg-gray-800'}`}
+              >
+                Heavy Hitters<br/><span className="text-xs font-normal opacity-70">&gt; 100 MB</span>
+              </button>
+              <button 
+                onClick={() => setScanMode('clutter')}
+                className={`flex-1 py-4 px-2 rounded-xl font-bold text-sm transition-all border border-gray-700/50 ${scanMode === 'clutter' ? 'bg-green-600 text-white shadow-[0_0_20px_rgba(22,163,74,0.3)]' : 'bg-gray-800/50 text-gray-500 hover:bg-gray-800'}`}
+              >
+                Clutter Sweeper<br/><span className="text-xs font-normal opacity-70">Loose Files &lt; 10 MB</span>
+              </button>
+            </div>
+
+            <div className="w-full bg-gray-800/50 p-6 rounded-2xl mb-8 border border-gray-700/50 flex flex-col gap-4 text-left shadow-lg">
+              <h3 className="font-bold text-sm tracking-widest uppercase text-gray-500 mb-2">Target Folders</h3>
+              {Object.entries(selectedDirs).map(([dir, active]) => (
+                <label key={dir} className="flex items-center space-x-4 cursor-pointer hover:bg-white/5 p-2 rounded-lg transition-colors">
+                  <input 
+                    type="checkbox" 
+                    checked={active}
+                    onChange={() => setSelectedDirs(prev => ({ ...prev, [dir]: !active }))}
+                    className="w-5 h-5 accent-blue-500 cursor-pointer" 
+                  />
+                  <span className="font-medium text-lg">{dir}</span>
+                </label>
+              ))}
+            </div>
+
+            <button 
+              onClick={startScan}
+              className="w-full py-4 bg-white text-black rounded-lg font-bold text-lg hover:scale-105 transition-transform cursor-pointer shadow-white/20 shadow-2xl"
+            >
+              Analyze Disk Space
+            </button>
+          </div>
         </div>
       )}
 
       {appState === 'SCANNING' && (
-        <div className="text-center space-y-4">
-          <div className="relative w-24 h-24 mx-auto">
-            <div className="absolute inset-0 bg-blue-500 rounded-full animate-ping opacity-20"></div>
+        <div className="flex-1 flex flex-col items-center justify-center bg-black">
+          <div className="relative w-32 h-32 mb-8 flex items-center justify-center">
+            <div className="absolute inset-0 border-4 border-blue-500/30 rounded-full animate-spin border-t-blue-500"></div>
             <Search className="w-12 h-12 absolute inset-0 m-auto text-blue-400 animate-pulse" />
           </div>
-          <h2 className="text-xl font-semibold">Hunting down heavy files...</h2>
-          <p className="text-gray-500 text-sm animate-pulse">Scanning selected folders</p>
+          <h2 className="text-2xl font-bold tracking-tight">Hunting down files...</h2>
+          <p className="text-gray-500 text-sm mt-2 animate-pulse font-mono tracking-widest uppercase">{scanMode} Mode</p>
         </div>
       )}
 
       {appState === 'CAROUSEL' && (
-        <div className="flex flex-col items-center w-full max-w-md h-full justify-center">
-          <h2 className="text-sm font-medium text-gray-400 mb-8 uppercase tracking-widest">
-            {files.length} Files Remaining
+        <div className="flex-1 flex flex-col items-center justify-center bg-black relative">
+          <div className="absolute inset-x-0 inset-y-0 pointer-events-none bg-gradient-to-b from-blue-900/10 to-black z-0"></div>
+          
+          <h2 className="absolute top-12 text-sm font-bold tracking-widest text-gray-500 uppercase z-10 font-mono">
+            {files.length} {scanMode === 'heavy' ? 'Giants' : 'Bundles'} Remaining
           </h2>
           
-          <div className="w-full aspect-[3/4] relative perspective-1000">
+          <div className="w-full aspect-[3/4] relative perspective-1000 z-10 max-w-sm mx-auto flex items-center justify-center">
             {history.length > 0 && (
               <button 
                 onClick={handleUndo} 
@@ -180,84 +203,106 @@ export default function App() {
               Home
             </button>
 
-            {files[0] && (
+            {currentFile && (
               <SwipeCard 
                 ref={swipeCardRef}
-                key={files[0].path}
-                file={files[0]}
-                onSwipeLeft={handleSwipeLeft}
-                onSwipeRight={handleSwipeRight}
-                onKeep={handleKeep}
-                onSwipeDown={handleSwipeDown}
+                file={currentFile} 
+                onSwipeLeft={() => handleSwipeLeft(currentFile)}
+                onSwipeRight={() => handleSwipeRight(currentFile)}
+                onKeep={() => handleKeep(currentFile)}
+                onSwipeDown={() => handleSwipeDown(currentFile)}
+                key={currentFile.id}
               />
             )}
+            {!currentFile && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center border-4 border-dashed border-gray-800 rounded-3xl">
+                <Sparkles className="w-16 h-16 text-gray-600 mb-4" />
+                <p className="text-gray-500 font-bold tracking-widest uppercase">All Clear!</p>
+              </div>
+            )}
           </div>
-          
-          <div className="flex w-full mt-10 space-x-2">
+
+          <div className="absolute bottom-12 w-full max-w-md px-6 flex justify-between items-end z-20">
             <button 
               onClick={() => swipeCardRef.current?.swipeLeft()}
-              className="flex-1 flex flex-col items-center justify-start text-red-500 hover:scale-110 hover:-translate-y-1 transition-all cursor-pointer bg-transparent border-none appearance-none"
+              className="flex flex-col items-center text-red-500 hover:scale-110 hover:text-red-400 transition-all cursor-pointer group"
             >
-              <Trash2 className="w-7 h-7 mb-2" />
-              <span className="text-[9px] font-bold uppercase tracking-widest text-center leading-tight">Delete</span>
+              <Trash2 className="w-8 h-8 mb-2 group-hover:-translate-y-1 transition-transform" />
+              <span className="text-[10px] whitespace-pre-wrap font-bold uppercase tracking-widest text-center leading-tight">
+                {currentFile?.isBundle ? 'Trash\nAll' : 'Delete'}
+              </span>
             </button>
             <button 
               onClick={() => swipeCardRef.current?.swipeDown()}
-              className="flex-1 flex flex-col items-center justify-start text-blue-400 hover:scale-110 hover:-translate-y-1 transition-all cursor-pointer bg-transparent border-none appearance-none"
+              className="flex flex-col items-center text-blue-500 hover:scale-110 hover:text-blue-400 transition-all cursor-pointer group translate-y-4"
             >
-              <Archive className="w-7 h-7 mb-2" />
-              <span className="text-[9px] font-bold uppercase tracking-widest text-center leading-tight">Temp Folder</span>
+              <Archive className="w-8 h-8 mb-2 group-hover:translate-y-1 transition-transform" />
+              <span className="text-[10px] whitespace-pre-wrap font-bold uppercase tracking-widest text-center leading-tight">
+                {currentFile?.isBundle ? 'Box\nIt Up' : 'Temp Folder'}
+              </span>
             </button>
             <button 
-              onClick={() => swipeCardRef.current?.swipeUp()}
-              className="flex-1 flex flex-col items-center justify-start text-yellow-500 hover:scale-110 hover:-translate-y-1 transition-all cursor-pointer bg-transparent border-none appearance-none"
+              onClick={() => swipeCardRef.current?.keep()}
+              className="flex flex-col items-center text-yellow-500 hover:scale-110 hover:text-yellow-400 transition-all cursor-pointer group translate-y-4"
             >
-              <Sparkles className="w-7 h-7 mb-2" />
-              <span className="text-[9px] font-bold uppercase tracking-widest text-center leading-tight">Keep Forever</span>
+              <Sparkles className="w-8 h-8 mb-2 group-hover:-translate-y-1 transition-transform" />
+              <span className="text-[10px] whitespace-pre-wrap font-bold uppercase tracking-widest text-center leading-tight">
+                {currentFile?.isBundle ? 'Keep\nMess' : 'Keep'}
+              </span>
             </button>
             <button 
               onClick={() => swipeCardRef.current?.swipeRight()}
-              className="flex-1 flex flex-col items-center justify-start text-green-500 hover:scale-110 hover:-translate-y-1 transition-all cursor-pointer bg-transparent border-none appearance-none"
+              className="flex flex-col items-center text-green-500 hover:scale-110 hover:text-green-400 transition-all cursor-pointer group"
             >
-              <RefreshCw className="w-7 h-7 mb-2" />
-              <span className="text-[9px] font-bold uppercase tracking-widest text-center leading-tight">Think About It</span>
+              <RefreshCw className="w-8 h-8 mb-2 group-hover:translate-y-1 transition-transform" />
+              <span className="text-[10px] whitespace-pre-wrap font-bold uppercase tracking-widest text-center leading-tight">
+                {currentFile?.isBundle ? 'Snooze\nStack' : 'Snooze'}
+              </span>
             </button>
           </div>
         </div>
       )}
 
       {appState === 'PROCESSING' && (
-        <div className="flex flex-col items-center animate-pulse">
+        <div className="flex-1 flex flex-col items-center justify-center bg-black animate-pulse">
           <Search className="w-16 h-16 text-blue-500 mb-6 animate-spin" />
           <h2 className="text-2xl font-bold">Executing Moves...</h2>
-          <p className="text-gray-400 mt-2">Updating Trash & Archive</p>
+          <p className="text-gray-400 mt-2 font-mono uppercase tracking-widest">Updating Filesystem</p>
         </div>
       )}
 
       {appState === 'COMPLETE' && (
-        <div className="flex flex-col items-center max-w-sm text-center">
+        <div className="flex-1 flex flex-col items-center justify-center p-8 bg-gradient-to-t from-green-900/20 to-black">
           <div className="w-24 h-24 bg-green-500/10 rounded-full flex items-center justify-center mb-8 border border-green-500/30">
             <Trash2 className="w-12 h-12 text-green-400" />
           </div>
           <h1 className="text-5xl font-black mb-6 tracking-tight">Boom.</h1>
           
-          <div className="w-full bg-gray-800/50 p-6 rounded-2xl mb-8 border border-gray-700/50">
-            <p className="text-gray-400 mb-2 font-medium tracking-widest uppercase text-xs">Total Trashed</p>
+          <div className="w-full max-w-sm bg-gray-800/50 p-6 rounded-2xl mb-8 border border-gray-700/50 text-center shadow-lg">
+            <p className="text-gray-400 mb-2 font-medium tracking-widest uppercase text-xs">Total Impact</p>
             <p className="text-4xl font-bold text-red-400">
               {(history.filter(h => h.action === 'trash').reduce((acc, h) => acc + h.file.size, 0) / 1024 / 1024 / 1024).toFixed(2)} GB
             </p>
+            <p className="text-xs text-gray-500 mt-2 uppercase tracking-widest">Marked for Deletion</p>
           </div>
 
-          <div className="flex justify-between w-full space-x-2">
+          <div className="flex flex-col max-w-sm w-full space-y-4">
             <button 
               onClick={history.length > 0 ? commitActions : window.api.emptyTrash}
-              className="flex-1 py-4 bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500 hover:text-white rounded-lg font-bold text-sm tracking-widest uppercase transition-colors"
+              className="w-full py-4 bg-red-600/20 text-red-400 border border-red-500/50 hover:bg-red-600 hover:text-white rounded-xl font-bold tracking-widest uppercase transition-all shadow-[0_0_20px_rgba(239,68,68,0.2)]"
             >
               {history.length > 0 ? "Commit All Moves" : "Empty Mac Trash Now"}
+            </button>
+            <button 
+              onClick={handleGoHome}
+              className="w-full py-4 bg-gray-800/50 text-gray-300 hover:bg-gray-700 rounded-xl font-bold tracking-widest uppercase transition-all"
+            >
+              Start New Scan
             </button>
           </div>
         </div>
       )}
+
     </div>
   )
 }

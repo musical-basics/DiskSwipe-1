@@ -2,7 +2,7 @@ import { app, shell, BrowserWindow, ipcMain, nativeImage } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
-import { checkPermissions, startScan, whitelistFile, snoozeFile, moveToTrash, emptyTrash, moveToTemp, executeActions } from './scanner'
+import { checkPermissions, startScan, executeActions, emptyTrash } from './scanner'
 
 function createWindow(): void {
   // Create the browser window.
@@ -52,16 +52,8 @@ app.whenReady().then(() => {
 
   // App IPC Handlers Hookup
   ipcMain.handle('check-permissions', async () => await checkPermissions())
-  ipcMain.handle('start-scan', async (_, directories) => await startScan(directories))
+  ipcMain.handle('start-scan', async (_, directories, mode) => await startScan(directories, mode))
   ipcMain.handle('execute-actions', async (_, actions) => await executeActions(actions))
-  ipcMain.handle('whitelist-file', async (_, filePath) => await whitelistFile(filePath))
-  ipcMain.handle('snooze-file', async (_, filePath) => await snoozeFile(filePath))
-  ipcMain.handle('move-to-trash', async (_, filePath) => {
-    await moveToTrash(filePath)
-  })
-  ipcMain.handle('move-to-temp', async (_, filePath) => {
-    await moveToTemp(filePath)
-  })
   ipcMain.handle('empty-trash', async () => {
     await emptyTrash()
   })

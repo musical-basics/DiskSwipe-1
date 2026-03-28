@@ -4,12 +4,8 @@ import { electronAPI } from '@electron-toolkit/preload'
 // Custom APIs for renderer
 const api = {
   checkPermissions: () => ipcRenderer.invoke('check-permissions'),
-  startScan: (directories: string[]) => ipcRenderer.invoke('start-scan', directories),
+  startScan: (directories: string[], mode: string) => ipcRenderer.invoke('start-scan', directories, mode),
   executeActions: (actions: any[]) => ipcRenderer.invoke('execute-actions', actions),
-  whitelistFile: (path: string) => ipcRenderer.invoke('whitelist-file', path),
-  snoozeFile: (path: string) => ipcRenderer.invoke('snooze-file', path),
-  moveToTrash: (path: string) => ipcRenderer.invoke('move-to-trash', path),
-  moveToTemp: (path: string) => ipcRenderer.invoke('move-to-temp', path),
   emptyTrash: () => ipcRenderer.invoke('empty-trash'),
   getFileThumbnail: (path: string) => ipcRenderer.invoke('get-file-thumbnail', path),
   openFile: (path: string) => ipcRenderer.invoke('open-file', path),

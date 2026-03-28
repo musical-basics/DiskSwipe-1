@@ -1,160 +1,172 @@
-import { motion, useAnimation, useMotionValue, useTransform, PanInfo } from 'framer-motion'
-import { HardDrive, Play, FolderSearch } from 'lucide-react'
-import { useEffect, useState, forwardRef, useImperativeHandle } from 'react'
-
-interface ScannedFile {
-  name: string
-  path: string
-  size: number
-  type: string
-  modifyTime: number
-}
+import { useState, useEffect, forwardRef, useImperativeHandle } from 'react'
+import { motion, useMotionValue, useTransform, useAnimation, PanInfo } from 'framer-motion'
+import { format } from 'date-fns'
+import { FolderCopy, FolderArchive, Layers, FolderDot } from 'lucide-react'
+import type { ScannedItem } from '../App'
 
 interface SwipeCardProps {
-  file: ScannedFile
-  onSwipeLeft: (file: ScannedFile) => void
-  onSwipeRight: (file: ScannedFile) => void
-  onKeep: (file: ScannedFile) => void
-  onSwipeDown: (file: ScannedFile) => void
+  file: ScannedItem
+  onSwipeLeft: () => void
+  onSwipeRight: () => void
+  onKeep: () => void
+  onSwipeDown: () => void
 }
 
 export interface SwipeCardRef {
-  swipeLeft: () => Promise<void>
-  swipeRight: () => Promise<void>
-  swipeUp: () => Promise<void>
-  swipeDown: () => Promise<void>
+  swipeLeft: () => void
+  swipeRight: () => void
+  keep: () => void
+  swipeDown: () => void
 }
 
-export const SwipeCard = forwardRef<SwipeCardRef, SwipeCardProps>(
-  ({ file, onSwipeLeft, onSwipeRight, onKeep, onSwipeDown }, ref) => {
-    const x = useMotionValue(0)
-    const y = useMotionValue(0)
-    const controls = useAnimation()
-  const [isAnimatingOut, setIsAnimatingOut] = useState(false)
+export const SwipeCard = forwardRef<SwipeCardRef, SwipeCardProps>(({ file, onSwipeLeft, onSwipeRight, onKeep, onSwipeDown }, ref) => {
   const [thumbnail, setThumbnail] = useState<string | null>(null)
-
+  
+  const x = useMotionValue(0)
+  const y = useMotionValue(0)
+  const controls = useAnimation()
+  
   const rotate = useTransform(x, [-200, 200], [-10, 10])
-  const opacity = useTransform(x, [-200, -100, 0, 100, 200], [0, 1, 1, 1, 0])
-  const background = useTransform(
-    x,
-    [-200, 0, 200],
-    ['rgba(239,68,68,0.2)', 'rgba(31,41,55,1)', 'rgba(34,197,94,0.2)']
-  )
-
-  useEffect(() => {
-    let isMounted = true
-    setThumbnail(null)
-    window.api.getFileThumbnail(file.path).then((dataUrl) => {
-      if (isMounted && dataUrl) setThumbnail(dataUrl)
-    })
-    return () => { isMounted = false }
-  }, [file])
+  const opacity = useTransform(y, [-200, 0, 200], [0.5, 1, 0.5])
+  
+  const SWIPE_THRESHOLD = 100
 
   useImperativeHandle(ref, () => ({
-    swipeLeft: () => handleSwipe('left'),
-    swipeRight: () => handleSwipe('right'),
-    swipeUp: () => handleSwipe('up'),
-    swipeDown: () => handleSwipe('down')
+    swipeLeft: async () => {
+      await controls.start({ x: -400, opacity: 0, transition: { duration: 0.3 } })
+      onSwipeLeft()
+    },
+    swipeRight: async () => {
+      await controls.start({ x: 400, opacity: 0, transition: { duration: 0.3 } })
+      onSwipeRight()
+    },
+    keep: async () => {
+      await controls.start({ y: -400, opacity: 0, transition: { duration: 0.3 } })
+      onKeep()
+    },
+    swipeDown: async () => {
+      await controls.start({ y: 400, opacity: 0, transition: { duration: 0.3 } })
+      onSwipeDown()
+    }
   }))
 
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (isAnimatingOut) return
-      if (e.key === 'ArrowLeft') handleSwipe('left')
-      if (e.key === 'ArrowRight') handleSwipe('right')
-      if (e.key === 'ArrowUp') handleSwipe('up')
-      if (e.key === 'ArrowDown') handleSwipe('down')
+    async function loadThumbnail() {
+      if (file.isBundle || !file.paths || !file.paths[0]) return
+      try {
+        const path = file.paths[0]
+        const dataUrl = await window.api.getFileThumbnail(path)
+        if (dataUrl) setThumbnail(dataUrl)
+      } catch (err) {
+        // empty
+      }
     }
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [file, isAnimatingOut])
-
-  // Automatically start animations on load
-  useEffect(() => {
-    controls.start({ scale: 1, opacity: 1, transition: { type: 'spring', damping: 15 } })
+    loadThumbnail()
   }, [file])
 
-  const handleSwipe = async (dir: 'left' | 'right' | 'up' | 'down') => {
-    setIsAnimatingOut(true)
-    if (dir === 'left') {
-      await controls.start({ x: -500, opacity: 0, transition: { duration: 0.2 } })
-      onSwipeLeft(file)
-    } else if (dir === 'right') {
-      await controls.start({ x: 500, opacity: 0, transition: { duration: 0.2 } })
-      onSwipeRight(file)
-    } else if (dir === 'up') {
-      await controls.start({ y: -500, opacity: 0, transition: { duration: 0.2 } })
-      onKeep(file)
-    } else if (dir === 'down') {
-      await controls.start({ y: 500, opacity: 0, transition: { duration: 0.2 } })
-      onSwipeDown(file)
-    }
-  }
+  const handleDragEnd = async (e: any, info: PanInfo) => {
+    const absX = Math.abs(info.offset.x)
+    const absY = Math.abs(info.offset.y)
 
-  const handleDragEnd = async (_e: any, info: PanInfo) => {
-    const threshold = 100
-    if (info.offset.y > threshold) {
-      await handleSwipe('down')
-    } else if (info.offset.y < -threshold) {
-      await handleSwipe('up')
-    } else if (info.offset.x < -threshold) {
-      await handleSwipe('left')
-    } else if (info.offset.x > threshold) {
-      await handleSwipe('right')
+    if (absX > absY) {
+      if (info.offset.x > SWIPE_THRESHOLD) {
+        await controls.start({ x: 400, opacity: 0, transition: { duration: 0.3 } })
+        onSwipeRight()
+      } else if (info.offset.x < -SWIPE_THRESHOLD) {
+        await controls.start({ x: -400, opacity: 0, transition: { duration: 0.3 } })
+        onSwipeLeft()
+      } else {
+        controls.start({ x: 0, y: 0, opacity: 1 })
+      }
     } else {
-      controls.start({ x: 0, y: 0 })
+      if (info.offset.y > SWIPE_THRESHOLD) {
+        await controls.start({ y: 400, opacity: 0, transition: { duration: 0.3 } })
+        onSwipeDown()
+      } else if (info.offset.y < -SWIPE_THRESHOLD) {
+        await controls.start({ y: -400, opacity: 0, transition: { duration: 0.3 } })
+        onKeep()
+      } else {
+        controls.start({ x: 0, y: 0, opacity: 1 })
+      }
     }
   }
 
-  const isVideo = ['mov', 'mp4', 'mkv', 'avi', 'webm'].includes(file.type.toLowerCase())
-  const dateStr = new Date(file.modifyTime).toLocaleDateString()
+  const isVideo = !file.isBundle && file.paths[0]?.toLowerCase().match(/\.(mp4|mov|mkv|avi)$/)
 
   return (
     <motion.div
+      className="absolute w-full h-[110%] bg-gradient-to-br from-gray-800 to-gray-900 rounded-3xl shadow-2xl flex flex-col items-center justify-center p-6 border border-gray-700/50 cursor-grab active:cursor-grabbing hover:shadow-blue-500/20 transition-shadow"
+      style={{ x, y, rotate, opacity }}
       drag
       dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
       onDragEnd={handleDragEnd}
-      style={{ x, y, rotate, backgroundColor: background, opacity }}
       animate={controls}
-      initial={{ scale: 0.95, opacity: 0, x: 0, y: 0 }}
-      className="border border-gray-700 w-full h-full rounded-2xl flex flex-col items-center justify-center p-8 shadow-2xl absolute inset-0 cursor-grab active:cursor-grabbing hover:shadow-blue-500/10 origin-bottom"
+      whileTap={{ scale: 0.98 }}
     >
-      <button
-        onPointerDown={(e) => e.stopPropagation()}
-        onClick={() => window.api.revealInFinder(file.path)}
-        className="absolute top-6 right-6 p-3 bg-gray-800/80 hover:bg-gray-700 text-gray-400 hover:text-white rounded-full transition-all cursor-pointer border border-gray-700/50 shadow-lg hover:scale-110 z-10"
+      <div 
+        onClick={(e) => {
+          e.stopPropagation()
+          if (!file.isBundle) {
+            window.api.revealInFinder(file.paths[0])
+          }
+        }}
+        className={`absolute top-4 right-4 bg-black/40 p-3 rounded-full hover:bg-blue-600 transition-colors cursor-pointer z-50 group border border-gray-700 ${file.isBundle ? 'hidden' : ''}`}
         title="Reveal in Finder"
       >
-        <FolderSearch className="w-5 h-5 pointer-events-none" />
-      </button>
+        <FolderDot className="w-4 h-4 text-gray-300 group-hover:text-white" />
+      </div>
 
-      {thumbnail ? (
-        <div className="relative w-[280px] h-[280px] mb-8 rounded-xl overflow-hidden shrink-0 shadow-2xl border border-gray-700/50 bg-black">
-          <img src={thumbnail} className="object-cover w-full h-full pointer-events-none" />
+      {file.isBundle ? (
+        <div className="relative w-full max-w-[240px] aspect-square mb-8 rounded-2xl shrink-0 shadow-[0_0_50px_rgba(0,0,0,0.5)] flex items-center justify-center pointer-events-none bg-gradient-to-br from-blue-900/40 to-indigo-900/40 border border-blue-500/20">
+          <Layers className="w-24 h-24 text-blue-400 opacity-30 absolute -rotate-12 transform -translate-x-4 translate-y-4 shadow-lg drop-shadow-lg" />
+          <FolderArchive className="w-24 h-24 text-indigo-400 opacity-60 absolute rotate-6 transform translate-x-4 -translate-y-2 drop-shadow-lg" />
+          <FolderCopy className="w-28 h-28 text-blue-300 z-10 drop-shadow-2xl" />
+        </div>
+      ) : thumbnail ? (
+        <div className="relative w-full max-w-[240px] aspect-square mb-8 rounded-2xl overflow-hidden shrink-0 shadow-[0_0_50px_rgba(0,0,0,0.5)] bg-black pointer-events-none border border-gray-700/50">
+          <img 
+            src={thumbnail} 
+            alt={file.name}
+            className="w-full h-full object-cover"
+            draggable="false"
+          />
           {isVideo && (
-            <button 
-              onPointerDown={(e) => e.stopPropagation()}
-              onClick={() => window.api.openFile(file.path)}
-              className="absolute inset-0 m-auto w-16 h-16 bg-black/60 hover:bg-black/80 rounded-full flex items-center justify-center backdrop-blur-md transition-all shadow-2xl cursor-pointer hover:scale-110"
-            >
-              <Play className="w-8 h-8 text-white ml-2 pointer-events-none" />
-            </button>
+            <div className="absolute inset-0 flex items-center justify-center bg-black/20 pointer-events-auto">
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation()
+                  window.api.openFile(file.paths[0])
+                }}
+                className="w-16 h-16 bg-white/20 backdrop-blur hover:bg-white/40 border-2 border-white/50 rounded-full flex items-center justify-center transition-all cursor-pointer group shadow-2xl"
+              >
+                <div className="ml-1 border-y-[12px] border-y-transparent border-l-[20px] border-l-white group-hover:scale-110 transition-transform"></div>
+              </button>
+            </div>
           )}
         </div>
       ) : (
-        <HardDrive className="w-32 h-32 text-gray-500 mb-8 pointer-events-none" />
+        <div className="w-full max-w-[240px] aspect-square mb-8 rounded-2xl bg-gradient-to-br from-gray-700 to-gray-800 shrink-0 shadow-[0_0_50px_rgba(0,0,0,0.5)] flex items-center justify-center text-4xl font-black text-gray-600 uppercase tracking-widest pointer-events-none border border-gray-600/50">
+          {file.type ? `.${file.type}` : 'FILE'}
+        </div>
       )}
 
-      <h3 className="text-xl font-bold text-center break-all line-clamp-3 px-4 pointer-events-none">
+      <h3 className="text-xl font-bold text-center break-words line-clamp-3 px-2 pointer-events-none leading-tight font-sans tracking-tight">
         {file.name}
       </h3>
-      <p className="text-blue-400 font-mono mt-4 text-2xl pointer-events-none">
-        {(file.size / 1024 / 1024).toFixed(1)} MB
+      
+      <p className="text-blue-400 font-mono mt-4 text-3xl font-light pointer-events-none flex items-baseline">
+        {(file.size / 1024 / 1024).toFixed(1)} <span className="text-sm ml-1 text-blue-500/50 font-bold uppercase tracking-widest">MB</span>
       </p>
-      <p className="text-gray-500 mt-2 text-sm uppercase pointer-events-none tracking-widest">
-        {file.type} &bull; {dateStr}
-      </p>
+      
+      {!file.isBundle && (
+        <div className="mt-6 flex flex-col items-center gap-1 pointer-events-none">
+          <p className="text-gray-500 font-bold tracking-widest text-[9px] uppercase border border-gray-700/50 rounded-full px-3 py-1 bg-gray-900/50 text-center">
+            LAST MODIFIED • {format(new Date(file.modifyTime), "MMM d, yyyy")}
+          </p>
+        </div>
+      )}
     </motion.div>
   )
 })
 
+SwipeCard.displayName = 'SwipeCard'
