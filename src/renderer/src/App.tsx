@@ -189,17 +189,26 @@ export default function App() {
             {history.length > 0 && (
               <button 
                 onClick={handleUndo} 
-                className="absolute -top-12 left-0 flex items-center bg-gray-800/80 border border-gray-700/50 hover:bg-gray-700 px-4 py-2 rounded-full cursor-pointer transition-colors shadow-lg z-20 text-blue-400 font-bold tracking-widest text-xs uppercase"
+                className="absolute -top-16 left-0 flex items-center bg-gray-800/80 border border-gray-700/50 hover:bg-gray-700 px-4 py-2 rounded-full cursor-pointer transition-colors shadow-lg z-20 text-blue-400 font-bold tracking-widest text-[10px] uppercase"
               >
                 Undo (⌘Z)
               </button>
             )}
 
+            {history.length > 0 && (
+              <button 
+                onClick={commitActions} 
+                className="absolute -top-16 left-1/2 -translate-x-1/2 flex items-center bg-red-600/90 border border-red-500 hover:bg-red-500 px-6 py-2 rounded-full cursor-pointer transition-colors shadow-[0_0_15px_rgba(239,68,68,0.5)] z-20 text-white font-black tracking-widest text-[10px] uppercase group scale-105"
+              >
+                COMMIT ({history.length})
+              </button>
+            )}
+
             <button 
               onClick={handleGoHome} 
-              className="absolute -top-12 right-0 flex items-center bg-gray-800/80 border border-gray-700/50 hover:bg-gray-700 px-4 py-2 rounded-full cursor-pointer transition-colors shadow-lg z-20 text-gray-400 hover:text-white font-bold tracking-widest text-xs uppercase"
+              className="absolute -top-16 right-0 flex items-center bg-gray-800/80 border border-gray-700/50 hover:bg-gray-700 px-4 py-2 rounded-full cursor-pointer transition-colors shadow-lg z-20 text-gray-400 hover:text-white font-bold tracking-widest text-[10px] uppercase"
             >
-              <Home className="w-4 h-4 mr-2" />
+              <Home className="w-3 h-3 mr-2" />
               Home
             </button>
 
