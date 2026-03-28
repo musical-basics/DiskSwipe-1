@@ -49,8 +49,16 @@ app.whenReady().then(() => {
     optimizer.watchWindowShortcuts(window)
   })
 
-  // IPC test
-  ipcMain.on('ping', () => console.log('pong'))
+  // App IPC Handlers Hookup
+  const scanner = require('./scanner')
+  
+  ipcMain.handle('check-permissions', async () => await scanner.checkPermissions())
+  ipcMain.handle('start-scan', async () => await scanner.startScan())
+  ipcMain.handle('whitelist-file', async (_, filePath) => await scanner.whitelistFile(filePath))
+  ipcMain.handle('snooze-file', async (_, filePath) => await scanner.snoozeFile(filePath))
+  ipcMain.handle('move-to-trash', async (_, filePath) => {
+    await scanner.moveToTrash(filePath)
+  })
 
   createWindow()
 

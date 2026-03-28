@@ -1,8 +1,14 @@
-import { contextBridge } from 'electron'
+import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 
 // Custom APIs for renderer
-const api = {}
+const api = {
+  checkPermissions: () => ipcRenderer.invoke('check-permissions'),
+  startScan: () => ipcRenderer.invoke('start-scan'),
+  whitelistFile: (path: string) => ipcRenderer.invoke('whitelist-file', path),
+  snoozeFile: (path: string) => ipcRenderer.invoke('snooze-file', path),
+  moveToTrash: (path: string) => ipcRenderer.invoke('move-to-trash', path)
+}
 
 // Use `contextBridge` APIs to expose Electron APIs to
 // renderer only if context isolation is enabled, otherwise
