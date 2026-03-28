@@ -4,3 +4,7 @@ out
 .DS_Store
 .eslintcache
 *.log*
+
+# Repomix Files
+repomix.xml
+repomix-output.xml

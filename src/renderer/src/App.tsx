@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Search, Trash2, ShieldAlert, Sparkles, RefreshCw, Archive } from 'lucide-react'
+import { Search, Trash2, ShieldAlert, Sparkles, RefreshCw, Archive, Home } from 'lucide-react'
 import { SwipeCard, SwipeCardRef } from './components/SwipeCard'
 
 // Define the core file interface mapped from preload
@@ -78,6 +78,17 @@ export default function App() {
     const lastAction = history[history.length - 1]
     setHistory(history.slice(0, -1))
     setFiles([lastAction.file, ...files])
+  }
+
+  const handleGoHome = () => {
+    if (history.length > 0) {
+      if (!window.confirm("You have uncommitted swipes. Are you sure you want to return home? Your staging queue will be lost.")) {
+        return
+      }
+    }
+    setHistory([])
+    setFiles([])
+    setAppState('PERMISSIONS')
   }
 
   useEffect(() => {
@@ -160,6 +171,14 @@ export default function App() {
                 Undo (⌘Z)
               </button>
             )}
+
+            <button 
+              onClick={handleGoHome} 
+              className="absolute -top-12 right-0 flex items-center bg-gray-800/80 border border-gray-700/50 hover:bg-gray-700 px-4 py-2 rounded-full cursor-pointer transition-colors shadow-lg z-20 text-gray-400 hover:text-white font-bold tracking-widest text-xs uppercase"
+            >
+              <Home className="w-4 h-4 mr-2" />
+              Home
+            </button>
 
             {files[0] && (
               <SwipeCard 
