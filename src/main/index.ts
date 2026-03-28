@@ -59,6 +59,9 @@ app.whenReady().then(() => {
   ipcMain.handle('move-to-trash', async (_, filePath) => {
     await scanner.moveToTrash(filePath)
   })
+  ipcMain.handle('empty-trash', async () => {
+    await scanner.emptyTrash()
+  })
 
   createWindow()
 

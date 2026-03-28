@@ -17,6 +17,7 @@ declare global {
       whitelistFile: (path: string) => Promise<void>
       snoozeFile: (path: string) => Promise<void>
       moveToTrash: (path: string) => Promise<void>
+      emptyTrash: () => Promise<void>
     }
   }
 }

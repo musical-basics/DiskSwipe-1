@@ -7,7 +7,8 @@ const api = {
   startScan: () => ipcRenderer.invoke('start-scan'),
   whitelistFile: (path: string) => ipcRenderer.invoke('whitelist-file', path),
   snoozeFile: (path: string) => ipcRenderer.invoke('snooze-file', path),
-  moveToTrash: (path: string) => ipcRenderer.invoke('move-to-trash', path)
+  moveToTrash: (path: string) => ipcRenderer.invoke('move-to-trash', path),
+  emptyTrash: () => ipcRenderer.invoke('empty-trash')
 }
 
 // Use `contextBridge` APIs to expose Electron APIs to

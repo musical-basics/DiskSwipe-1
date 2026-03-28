@@ -136,3 +136,23 @@ export async function startScan(): Promise<ScannedFile[]> {
 
   return files.sort((a, b) => b.size - a.size)
 }
+
+import { exec } from 'child_process'
+
+export function emptyTrash(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (process.platform === 'darwin') {
+      exec(`osascript -e 'tell application "Finder" to empty trash'`, (error) => {
+        if (error) {
+          console.error(error)
+          reject(error)
+        } else {
+          resolve()
+        }
+      })
+    } else {
+      resolve()
+    }
+  })
+}
+

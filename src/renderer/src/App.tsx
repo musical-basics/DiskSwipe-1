@@ -23,6 +23,11 @@ export default function App() {
   }, [])
 
   const checkInitialPermissions = async () => {
+    if (!window.api) {
+      alert("You are viewing the React dev server in a browser!\nSwipeSweep requires Electron Native APIs.\n\nPlease look for the Electron app window in your dock or run 'pnpm dev' again.")
+      return
+    }
+
     const hasPermission = await window.api.checkPermissions()
     if (hasPermission) {
       startScanningProcess()
@@ -150,7 +155,10 @@ export default function App() {
           
           <div className="pt-8 space-y-3">
             <button 
-              onClick={() => alert('Will trigger OS trash clear in v2')}
+              onClick={async () => {
+                await window.api.emptyTrash()
+                alert('macOS Trash successfully emptied!')
+              }}
               className="w-full py-4 bg-red-600 hover:bg-red-700 rounded-xl font-bold transition-colors shadow-lg"
             >
               Empty Trash Now
