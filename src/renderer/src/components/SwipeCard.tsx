@@ -135,5 +135,5 @@ export const SwipeCard = forwardRef<SwipeCardRef, SwipeCardProps>(
       </p>
     </motion.div>
   )
-}
+})
 
