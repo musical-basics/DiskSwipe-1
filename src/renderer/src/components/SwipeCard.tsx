@@ -1,6 +1,6 @@
 import { useState, useEffect, forwardRef, useImperativeHandle } from 'react'
 import { motion, useMotionValue, useTransform, useAnimation, PanInfo } from 'framer-motion'
-import { FolderCopy, FolderArchive, Layers, FolderDot } from 'lucide-react'
+import { Copy, Archive, Layers, Folder } from 'lucide-react'
 import type { ScannedItem } from '../App'
 
 interface SwipeCardProps {
@@ -63,7 +63,7 @@ export const SwipeCard = forwardRef<SwipeCardRef, SwipeCardProps>(({ file, onSwi
     loadThumbnail()
   }, [file])
 
-  const handleDragEnd = async (e: any, info: PanInfo) => {
+  const handleDragEnd = async (_: any, info: PanInfo) => {
     const absX = Math.abs(info.offset.x)
     const absY = Math.abs(info.offset.y)
 
@@ -112,14 +112,14 @@ export const SwipeCard = forwardRef<SwipeCardRef, SwipeCardProps>(({ file, onSwi
         className={`absolute top-4 right-4 bg-black/40 p-3 rounded-full hover:bg-blue-600 transition-colors cursor-pointer z-50 group border border-gray-700 ${file.isBundle ? 'hidden' : ''}`}
         title="Reveal in Finder"
       >
-        <FolderDot className="w-4 h-4 text-gray-300 group-hover:text-white" />
+        <Folder className="w-4 h-4 text-gray-300 group-hover:text-white" />
       </div>
 
       {file.isBundle ? (
         <div className="relative w-full max-w-[240px] aspect-square mb-8 rounded-2xl shrink-0 shadow-[0_0_50px_rgba(0,0,0,0.5)] flex items-center justify-center pointer-events-none bg-gradient-to-br from-blue-900/40 to-indigo-900/40 border border-blue-500/20">
           <Layers className="w-24 h-24 text-blue-400 opacity-30 absolute -rotate-12 transform -translate-x-4 translate-y-4 shadow-lg drop-shadow-lg" />
-          <FolderArchive className="w-24 h-24 text-indigo-400 opacity-60 absolute rotate-6 transform translate-x-4 -translate-y-2 drop-shadow-lg" />
-          <FolderCopy className="w-28 h-28 text-blue-300 z-10 drop-shadow-2xl" />
+          <Archive className="w-24 h-24 text-indigo-400 opacity-60 absolute rotate-6 transform translate-x-4 -translate-y-2 drop-shadow-lg" />
+          <Copy className="w-28 h-28 text-blue-300 z-10 drop-shadow-2xl" />
         </div>
       ) : thumbnail ? (
         <div className="relative w-full max-w-[240px] aspect-square mb-8 rounded-2xl overflow-hidden shrink-0 shadow-[0_0_50px_rgba(0,0,0,0.5)] bg-black pointer-events-none border border-gray-700/50">
