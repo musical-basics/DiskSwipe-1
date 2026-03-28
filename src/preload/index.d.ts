@@ -20,6 +20,7 @@ declare global {
       emptyTrash: () => Promise<void>
       getFileThumbnail: (path: string) => Promise<string | null>
       openFile: (path: string) => Promise<void>
+      revealInFinder: (path: string) => Promise<void>
     }
   }
 }

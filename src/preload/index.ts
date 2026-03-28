@@ -10,7 +10,8 @@ const api = {
   moveToTrash: (path: string) => ipcRenderer.invoke('move-to-trash', path),
   emptyTrash: () => ipcRenderer.invoke('empty-trash'),
   getFileThumbnail: (path: string) => ipcRenderer.invoke('get-file-thumbnail', path),
-  openFile: (path: string) => ipcRenderer.invoke('open-file', path)
+  openFile: (path: string) => ipcRenderer.invoke('open-file', path),
+  revealInFinder: (path: string) => ipcRenderer.invoke('reveal-in-finder', path)
 }
 
 // Use `contextBridge` APIs to expose Electron APIs to

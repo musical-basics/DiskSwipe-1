@@ -72,6 +72,9 @@ app.whenReady().then(() => {
   ipcMain.handle('open-file', async (_, filePath) => {
     await shell.openPath(filePath)
   })
+  ipcMain.handle('reveal-in-finder', (_, filePath) => {
+    shell.showItemInFolder(filePath)
+  })
 
   createWindow()
 

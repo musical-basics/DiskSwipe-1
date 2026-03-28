@@ -1,5 +1,5 @@
 import { motion, useAnimation, useMotionValue, useTransform, PanInfo } from 'framer-motion'
-import { HardDrive, Play } from 'lucide-react'
+import { HardDrive, Play, FolderSearch } from 'lucide-react'
 import { useEffect, useState, forwardRef, useImperativeHandle } from 'react'
 
 interface ScannedFile {
@@ -107,6 +107,15 @@ export const SwipeCard = forwardRef<SwipeCardRef, SwipeCardProps>(
       initial={{ scale: 0.95, opacity: 0, x: 0, y: 0 }}
       className="border border-gray-700 w-full h-full rounded-2xl flex flex-col items-center justify-center p-8 shadow-2xl absolute inset-0 cursor-grab active:cursor-grabbing hover:shadow-blue-500/10 origin-bottom"
     >
+      <button
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={() => window.api.revealInFinder(file.path)}
+        className="absolute top-6 right-6 p-3 bg-gray-800/80 hover:bg-gray-700 text-gray-400 hover:text-white rounded-full transition-all cursor-pointer border border-gray-700/50 shadow-lg hover:scale-110 z-10"
+        title="Reveal in Finder"
+      >
+        <FolderSearch className="w-5 h-5 pointer-events-none" />
+      </button>
+
       {thumbnail ? (
         <div className="relative w-[280px] h-[280px] mb-8 rounded-xl overflow-hidden shrink-0 shadow-2xl border border-gray-700/50 bg-black">
           <img src={thumbnail} className="object-cover w-full h-full pointer-events-none" />
