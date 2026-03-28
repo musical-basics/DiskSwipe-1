@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { HardDrive, Search, Trash2, ShieldAlert, Sparkles, RefreshCw } from 'lucide-react'
+import { Search, Trash2, ShieldAlert, Sparkles, RefreshCw } from 'lucide-react'
+import { SwipeCard } from './components/SwipeCard'
 
 // Define the core file interface mapped from preload
 interface ScannedFile {
@@ -45,20 +46,31 @@ export default function App() {
   }
 
   const handleGrantPermission = async () => {
-    // Check again assuming user has navigated macOS settings
     checkInitialPermissions()
   }
 
-  // Temporary stub until Phase 4 (Framer Motion SwipeCard)
   const handleNext = () => {
     if (files.length <= 1) {
       setAppState('COMPLETE')
     } else {
-      // Log interaction roughly
-      const trashed = files[0].size
-      setTrashedSize(prev => prev + (trashed / 1024 / 1024 / 1024))
       setFiles(files.slice(1))
     }
+  }
+
+  const handleSwipeLeft = async (file: ScannedFile) => {
+    await window.api.moveToTrash(file.path)
+    setTrashedSize(prev => prev + (file.size / 1024 / 1024 / 1024))
+    handleNext()
+  }
+
+  const handleSwipeRight = async (file: ScannedFile) => {
+    await window.api.snoozeFile(file.path)
+    handleNext()
+  }
+
+  const handleKeep = async (file: ScannedFile) => {
+    await window.api.whitelistFile(file.path)
+    handleNext()
   }
 
   return (
@@ -97,22 +109,16 @@ export default function App() {
             {files.length} Files Remaining
           </h2>
           
-          <div className="bg-gray-800 border border-gray-700 w-full aspect-[3/4] rounded-2xl flex flex-col items-center justify-center p-8 shadow-2xl relative">
-            <HardDrive className="w-20 h-20 text-gray-500 mb-6" />
-            <h3 className="text-xl font-bold text-center break-all line-clamp-2">
-              {files[0]?.name}
-            </h3>
-            <p className="text-blue-400 font-mono mt-4 text-2xl">
-              {(files[0]?.size / 1024 / 1024).toFixed(1)} MB
-            </p>
-            <p className="text-gray-500 mt-2 text-sm uppercase">{files[0]?.type}</p>
-            
-            <button 
-              onClick={handleNext} 
-              className="absolute bottom-6 px-6 py-2 bg-gray-700 rounded-full text-sm font-medium hover:bg-gray-600 transition-colors"
-            >
-              Simulate Swipe (Dev)
-            </button>
+          <div className="w-full aspect-[3/4] relative perspective-1000">
+            {files[0] && (
+              <SwipeCard 
+                key={files[0].path}
+                file={files[0]}
+                onSwipeLeft={handleSwipeLeft}
+                onSwipeRight={handleSwipeRight}
+                onKeep={handleKeep}
+              />
+            )}
           </div>
           
           <div className="flex justify-between w-full mt-10 px-4">
@@ -144,7 +150,7 @@ export default function App() {
           
           <div className="pt-8 space-y-3">
             <button 
-               onClick={() => alert('Will trigger OS trash clear in v2')}
+              onClick={() => alert('Will trigger OS trash clear in v2')}
               className="w-full py-4 bg-red-600 hover:bg-red-700 rounded-xl font-bold transition-colors shadow-lg"
             >
               Empty Trash Now
