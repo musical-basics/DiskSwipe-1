@@ -1,6 +1,5 @@
 import { useState, useEffect, forwardRef, useImperativeHandle } from 'react'
 import { motion, useMotionValue, useTransform, useAnimation, PanInfo } from 'framer-motion'
-import { format } from 'date-fns'
 import { FolderCopy, FolderArchive, Layers, FolderDot } from 'lucide-react'
 import type { ScannedItem } from '../App'
 
@@ -161,7 +160,7 @@ export const SwipeCard = forwardRef<SwipeCardRef, SwipeCardProps>(({ file, onSwi
       {!file.isBundle && (
         <div className="mt-6 flex flex-col items-center gap-1 pointer-events-none">
           <p className="text-gray-500 font-bold tracking-widest text-[9px] uppercase border border-gray-700/50 rounded-full px-3 py-1 bg-gray-900/50 text-center">
-            LAST MODIFIED • {format(new Date(file.modifyTime), "MMM d, yyyy")}
+            LAST MODIFIED • {file.modifyTime ? new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(new Date(file.modifyTime)) : 'UNKNOWN'}
           </p>
         </div>
       )}
