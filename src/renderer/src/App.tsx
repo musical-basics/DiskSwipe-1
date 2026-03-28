@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Search, Trash2, ShieldAlert, Sparkles, RefreshCw } from 'lucide-react'
-import { SwipeCard } from './components/SwipeCard'
+import { SwipeCard, SwipeCardRef } from './components/SwipeCard'
 
 // Define the core file interface mapped from preload
 interface ScannedFile {
@@ -17,6 +17,7 @@ export default function App() {
   const [appState, setAppState] = useState<AppState>('PERMISSIONS')
   const [files, setFiles] = useState<ScannedFile[]>([])
   const [trashedSize, setTrashedSize] = useState(0)
+  const swipeCardRef = useRef<SwipeCardRef>(null)
 
   useEffect(() => {
     checkInitialPermissions()
@@ -117,6 +118,7 @@ export default function App() {
           <div className="w-full aspect-[3/4] relative perspective-1000">
             {files[0] && (
               <SwipeCard 
+                ref={swipeCardRef}
                 key={files[0].path}
                 file={files[0]}
                 onSwipeLeft={handleSwipeLeft}
@@ -127,18 +129,27 @@ export default function App() {
           </div>
           
           <div className="flex justify-between w-full mt-10 px-4">
-            <div className="flex flex-col items-center text-red-400">
+            <button 
+              onClick={() => swipeCardRef.current?.swipeLeft()}
+              className="flex flex-col items-center justify-center text-red-500 hover:scale-110 hover:-translate-y-1 transition-all cursor-pointer bg-transparent border-none appearance-none"
+            >
               <Trash2 className="w-8 h-8 mb-2" />
               <span className="text-xs font-bold uppercase tracking-widest">Delete</span>
-            </div>
-            <div className="flex flex-col items-center text-yellow-500">
+            </button>
+            <button 
+              onClick={() => swipeCardRef.current?.swipeUp()}
+              className="flex flex-col items-center justify-center text-yellow-500 hover:scale-110 hover:-translate-y-1 transition-all cursor-pointer bg-transparent border-none appearance-none"
+            >
               <Sparkles className="w-8 h-8 mb-2" />
               <span className="text-xs font-bold uppercase tracking-widest">Keep Forever</span>
-            </div>
-            <div className="flex flex-col items-center text-green-400">
+            </button>
+            <button 
+              onClick={() => swipeCardRef.current?.swipeRight()}
+              className="flex flex-col items-center justify-center text-green-500 hover:scale-110 hover:-translate-y-1 transition-all cursor-pointer bg-transparent border-none appearance-none"
+            >
               <RefreshCw className="w-8 h-8 mb-2" />
               <span className="text-xs font-bold uppercase tracking-widest">Think About It</span>
-            </div>
+            </button>
           </div>
         </div>
       )}

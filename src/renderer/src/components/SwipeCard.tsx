@@ -1,6 +1,6 @@
 import { motion, useAnimation, useMotionValue, useTransform, PanInfo } from 'framer-motion'
 import { HardDrive, Play } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, forwardRef, useImperativeHandle } from 'react'
 
 interface ScannedFile {
   name: string
@@ -17,8 +17,15 @@ interface SwipeCardProps {
   onKeep: (file: ScannedFile) => void
 }
 
-export function SwipeCard({ file, onSwipeLeft, onSwipeRight, onKeep }: SwipeCardProps) {
-  const x = useMotionValue(0)
+export interface SwipeCardRef {
+  swipeLeft: () => Promise<void>
+  swipeRight: () => Promise<void>
+  swipeUp: () => Promise<void>
+}
+
+export const SwipeCard = forwardRef<SwipeCardRef, SwipeCardProps>(
+  ({ file, onSwipeLeft, onSwipeRight, onKeep }, ref) => {
+    const x = useMotionValue(0)
   const controls = useAnimation()
   const [isAnimatingOut, setIsAnimatingOut] = useState(false)
   const [thumbnail, setThumbnail] = useState<string | null>(null)
@@ -39,6 +46,12 @@ export function SwipeCard({ file, onSwipeLeft, onSwipeRight, onKeep }: SwipeCard
     })
     return () => { isMounted = false }
   }, [file])
+
+  useImperativeHandle(ref, () => ({
+    swipeLeft: () => handleSwipe('left'),
+    swipeRight: () => handleSwipe('right'),
+    swipeUp: () => handleSwipe('up')
+  }))
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -123,3 +136,4 @@ export function SwipeCard({ file, onSwipeLeft, onSwipeRight, onKeep }: SwipeCard
     </motion.div>
   )
 }
+
