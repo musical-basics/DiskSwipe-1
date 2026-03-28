@@ -108,8 +108,13 @@ export default function App() {
     // Send the array of paths down
     const acts = history.map(h => ({ paths: h.file.paths, action: h.action }))
     await window.api.executeActions(acts)
-    setAppState('COMPLETE')
     setHistory([])
+    
+    if (files.length > 0) {
+      setAppState('CAROUSEL')
+    } else {
+      setAppState('COMPLETE')
+    }
   }
 
   const currentFile = files[0]
