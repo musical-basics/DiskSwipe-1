@@ -2,6 +2,7 @@ import { app, shell, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
+import { checkPermissions, startScan, whitelistFile, snoozeFile, moveToTrash, emptyTrash } from './scanner'
 
 function createWindow(): void {
   // Create the browser window.
@@ -50,17 +51,15 @@ app.whenReady().then(() => {
   })
 
   // App IPC Handlers Hookup
-  const scanner = require('./scanner')
-  
-  ipcMain.handle('check-permissions', async () => await scanner.checkPermissions())
-  ipcMain.handle('start-scan', async () => await scanner.startScan())
-  ipcMain.handle('whitelist-file', async (_, filePath) => await scanner.whitelistFile(filePath))
-  ipcMain.handle('snooze-file', async (_, filePath) => await scanner.snoozeFile(filePath))
+  ipcMain.handle('check-permissions', async () => await checkPermissions())
+  ipcMain.handle('start-scan', async () => await startScan())
+  ipcMain.handle('whitelist-file', async (_, filePath) => await whitelistFile(filePath))
+  ipcMain.handle('snooze-file', async (_, filePath) => await snoozeFile(filePath))
   ipcMain.handle('move-to-trash', async (_, filePath) => {
-    await scanner.moveToTrash(filePath)
+    await moveToTrash(filePath)
   })
   ipcMain.handle('empty-trash', async () => {
-    await scanner.emptyTrash()
+    await emptyTrash()
   })
 
   createWindow()
