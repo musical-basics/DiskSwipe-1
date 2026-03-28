@@ -89,7 +89,7 @@ export function SwipeCard({ file, onSwipeLeft, onSwipeRight, onKeep }: SwipeCard
       drag="x"
       dragConstraints={{ left: 0, right: 0 }}
       onDragEnd={handleDragEnd}
-      style={{ x, rotate, backgroundColor: background }}
+      style={{ x, rotate, backgroundColor: background, opacity }}
       animate={controls}
       initial={{ scale: 0.95, opacity: 0, x: 0, y: 0 }}
       className="border border-gray-700 w-full h-full rounded-2xl flex flex-col items-center justify-center p-8 shadow-2xl absolute inset-0 cursor-grab active:cursor-grabbing hover:shadow-blue-500/10 origin-bottom"
