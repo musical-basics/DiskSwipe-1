@@ -63,7 +63,7 @@ app.whenReady().then(() => {
   })
   ipcMain.handle('get-file-thumbnail', async (_, filePath) => {
     try {
-      const image = await nativeImage.createThumbnailFromPath(filePath, { width: 400, height: 400 })
+      const image = await nativeImage.createThumbnailFromPath(filePath, { width: 800, height: 800 })
       return image.toDataURL()
     } catch {
       return null

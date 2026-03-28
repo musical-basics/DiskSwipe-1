@@ -108,20 +108,20 @@ export const SwipeCard = forwardRef<SwipeCardRef, SwipeCardProps>(
       className="border border-gray-700 w-full h-full rounded-2xl flex flex-col items-center justify-center p-8 shadow-2xl absolute inset-0 cursor-grab active:cursor-grabbing hover:shadow-blue-500/10 origin-bottom"
     >
       {thumbnail ? (
-        <div className="relative w-48 h-48 mb-6 rounded-lg overflow-hidden shrink-0 shadow-xl border border-gray-700/50 bg-black">
+        <div className="relative w-[280px] h-[280px] mb-8 rounded-xl overflow-hidden shrink-0 shadow-2xl border border-gray-700/50 bg-black">
           <img src={thumbnail} className="object-cover w-full h-full pointer-events-none" />
           {isVideo && (
             <button 
               onPointerDown={(e) => e.stopPropagation()}
               onClick={() => window.api.openFile(file.path)}
-              className="absolute inset-0 m-auto w-14 h-14 bg-black/60 hover:bg-black/80 rounded-full flex items-center justify-center backdrop-blur-sm transition-all shadow-lg cursor-pointer hover:scale-105"
+              className="absolute inset-0 m-auto w-16 h-16 bg-black/60 hover:bg-black/80 rounded-full flex items-center justify-center backdrop-blur-md transition-all shadow-2xl cursor-pointer hover:scale-110"
             >
-              <Play className="w-6 h-6 text-white ml-1 pointer-events-none" />
+              <Play className="w-8 h-8 text-white ml-2 pointer-events-none" />
             </button>
           )}
         </div>
       ) : (
-        <HardDrive className="w-20 h-20 text-gray-500 mb-6 pointer-events-none" />
+        <HardDrive className="w-32 h-32 text-gray-500 mb-8 pointer-events-none" />
       )}
 
       <h3 className="text-xl font-bold text-center break-all line-clamp-3 px-4 pointer-events-none">
