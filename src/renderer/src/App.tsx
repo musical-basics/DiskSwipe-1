@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Search, Trash2, ShieldAlert, Sparkles, RefreshCw } from 'lucide-react'
+import { Search, Trash2, ShieldAlert, Sparkles, RefreshCw, Archive } from 'lucide-react'
 import { SwipeCard, SwipeCardRef } from './components/SwipeCard'
 
 // Define the core file interface mapped from preload
@@ -79,6 +79,11 @@ export default function App() {
     handleNext()
   }
 
+  const handleSwipeDown = async (file: ScannedFile) => {
+    await window.api.moveToTemp(file.path)
+    handleNext()
+  }
+
   return (
     <div className="h-screen w-screen flex flex-col items-center justify-center p-6 space-y-6">
       {appState === 'PERMISSIONS' && (
@@ -124,31 +129,39 @@ export default function App() {
                 onSwipeLeft={handleSwipeLeft}
                 onSwipeRight={handleSwipeRight}
                 onKeep={handleKeep}
+                onSwipeDown={handleSwipeDown}
               />
             )}
           </div>
           
-          <div className="flex justify-between w-full mt-10 px-4">
+          <div className="flex w-full mt-10 space-x-2">
             <button 
               onClick={() => swipeCardRef.current?.swipeLeft()}
-              className="flex flex-col items-center justify-center text-red-500 hover:scale-110 hover:-translate-y-1 transition-all cursor-pointer bg-transparent border-none appearance-none"
+              className="flex-1 flex flex-col items-center justify-start text-red-500 hover:scale-110 hover:-translate-y-1 transition-all cursor-pointer bg-transparent border-none appearance-none"
             >
-              <Trash2 className="w-8 h-8 mb-2" />
-              <span className="text-xs font-bold uppercase tracking-widest">Delete</span>
+              <Trash2 className="w-7 h-7 mb-2" />
+              <span className="text-[9px] font-bold uppercase tracking-widest text-center leading-tight">Delete</span>
+            </button>
+            <button 
+              onClick={() => swipeCardRef.current?.swipeDown()}
+              className="flex-1 flex flex-col items-center justify-start text-blue-400 hover:scale-110 hover:-translate-y-1 transition-all cursor-pointer bg-transparent border-none appearance-none"
+            >
+              <Archive className="w-7 h-7 mb-2" />
+              <span className="text-[9px] font-bold uppercase tracking-widest text-center leading-tight">Temp Folder</span>
             </button>
             <button 
               onClick={() => swipeCardRef.current?.swipeUp()}
-              className="flex flex-col items-center justify-center text-yellow-500 hover:scale-110 hover:-translate-y-1 transition-all cursor-pointer bg-transparent border-none appearance-none"
+              className="flex-1 flex flex-col items-center justify-start text-yellow-500 hover:scale-110 hover:-translate-y-1 transition-all cursor-pointer bg-transparent border-none appearance-none"
             >
-              <Sparkles className="w-8 h-8 mb-2" />
-              <span className="text-xs font-bold uppercase tracking-widest">Keep Forever</span>
+              <Sparkles className="w-7 h-7 mb-2" />
+              <span className="text-[9px] font-bold uppercase tracking-widest text-center leading-tight">Keep Forever</span>
             </button>
             <button 
               onClick={() => swipeCardRef.current?.swipeRight()}
-              className="flex flex-col items-center justify-center text-green-500 hover:scale-110 hover:-translate-y-1 transition-all cursor-pointer bg-transparent border-none appearance-none"
+              className="flex-1 flex flex-col items-center justify-start text-green-500 hover:scale-110 hover:-translate-y-1 transition-all cursor-pointer bg-transparent border-none appearance-none"
             >
-              <RefreshCw className="w-8 h-8 mb-2" />
-              <span className="text-xs font-bold uppercase tracking-widest">Think About It</span>
+              <RefreshCw className="w-7 h-7 mb-2" />
+              <span className="text-[9px] font-bold uppercase tracking-widest text-center leading-tight">Think About It</span>
             </button>
           </div>
         </div>

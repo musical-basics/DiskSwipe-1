@@ -79,6 +79,16 @@ export async function moveToTrash(filePath: string) {
   await shell.trashItem(filePath)
 }
 
+export async function moveToTemp(filePath: string) {
+  const tempDir = path.join(os.homedir(), 'Documents', 'temp')
+  await fs.mkdir(tempDir, { recursive: true }).catch(() => {})
+  const dest = path.join(tempDir, path.basename(filePath))
+  await fs.rename(filePath, dest).catch(async () => {
+    await fs.copyFile(filePath, dest)
+    await fs.unlink(filePath)
+  })
+}
+
 function isSnoozed(filePath: string): boolean {
   if (!snoozeMap.has(filePath)) return false
   const time = snoozeMap.get(filePath)!

@@ -15,18 +15,21 @@ interface SwipeCardProps {
   onSwipeLeft: (file: ScannedFile) => void
   onSwipeRight: (file: ScannedFile) => void
   onKeep: (file: ScannedFile) => void
+  onSwipeDown: (file: ScannedFile) => void
 }
 
 export interface SwipeCardRef {
   swipeLeft: () => Promise<void>
   swipeRight: () => Promise<void>
   swipeUp: () => Promise<void>
+  swipeDown: () => Promise<void>
 }
 
 export const SwipeCard = forwardRef<SwipeCardRef, SwipeCardProps>(
-  ({ file, onSwipeLeft, onSwipeRight, onKeep }, ref) => {
+  ({ file, onSwipeLeft, onSwipeRight, onKeep, onSwipeDown }, ref) => {
     const x = useMotionValue(0)
-  const controls = useAnimation()
+    const y = useMotionValue(0)
+    const controls = useAnimation()
   const [isAnimatingOut, setIsAnimatingOut] = useState(false)
   const [thumbnail, setThumbnail] = useState<string | null>(null)
 
@@ -50,7 +53,8 @@ export const SwipeCard = forwardRef<SwipeCardRef, SwipeCardProps>(
   useImperativeHandle(ref, () => ({
     swipeLeft: () => handleSwipe('left'),
     swipeRight: () => handleSwipe('right'),
-    swipeUp: () => handleSwipe('up')
+    swipeUp: () => handleSwipe('up'),
+    swipeDown: () => handleSwipe('down')
   }))
 
   useEffect(() => {
@@ -59,6 +63,7 @@ export const SwipeCard = forwardRef<SwipeCardRef, SwipeCardProps>(
       if (e.key === 'ArrowLeft') handleSwipe('left')
       if (e.key === 'ArrowRight') handleSwipe('right')
       if (e.key === 'ArrowUp') handleSwipe('up')
+      if (e.key === 'ArrowDown') handleSwipe('down')
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
@@ -69,7 +74,7 @@ export const SwipeCard = forwardRef<SwipeCardRef, SwipeCardProps>(
     controls.start({ scale: 1, opacity: 1, transition: { type: 'spring', damping: 15 } })
   }, [file])
 
-  const handleSwipe = async (dir: 'left' | 'right' | 'up') => {
+  const handleSwipe = async (dir: 'left' | 'right' | 'up' | 'down') => {
     setIsAnimatingOut(true)
     if (dir === 'left') {
       await controls.start({ x: -500, opacity: 0, transition: { duration: 0.2 } })
@@ -78,14 +83,21 @@ export const SwipeCard = forwardRef<SwipeCardRef, SwipeCardProps>(
       await controls.start({ x: 500, opacity: 0, transition: { duration: 0.2 } })
       onSwipeRight(file)
     } else if (dir === 'up') {
-      await controls.start({ scale: 0, opacity: 0, transition: { duration: 0.2 } })
+      await controls.start({ y: -500, opacity: 0, transition: { duration: 0.2 } })
       onKeep(file)
+    } else if (dir === 'down') {
+      await controls.start({ y: 500, opacity: 0, transition: { duration: 0.2 } })
+      onSwipeDown(file)
     }
   }
 
   const handleDragEnd = async (_e: any, info: PanInfo) => {
     const threshold = 100
-    if (info.offset.x < -threshold) {
+    if (info.offset.y > threshold) {
+      await handleSwipe('down')
+    } else if (info.offset.y < -threshold) {
+      await handleSwipe('up')
+    } else if (info.offset.x < -threshold) {
       await handleSwipe('left')
     } else if (info.offset.x > threshold) {
       await handleSwipe('right')
@@ -99,10 +111,10 @@ export const SwipeCard = forwardRef<SwipeCardRef, SwipeCardProps>(
 
   return (
     <motion.div
-      drag="x"
-      dragConstraints={{ left: 0, right: 0 }}
+      drag
+      dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
       onDragEnd={handleDragEnd}
-      style={{ x, rotate, backgroundColor: background, opacity }}
+      style={{ x, y, rotate, backgroundColor: background, opacity }}
       animate={controls}
       initial={{ scale: 0.95, opacity: 0, x: 0, y: 0 }}
       className="border border-gray-700 w-full h-full rounded-2xl flex flex-col items-center justify-center p-8 shadow-2xl absolute inset-0 cursor-grab active:cursor-grabbing hover:shadow-blue-500/10 origin-bottom"

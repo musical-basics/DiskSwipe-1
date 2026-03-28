@@ -2,7 +2,7 @@ import { app, shell, BrowserWindow, ipcMain, nativeImage } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
-import { checkPermissions, startScan, whitelistFile, snoozeFile, moveToTrash, emptyTrash } from './scanner'
+import { checkPermissions, startScan, whitelistFile, snoozeFile, moveToTrash, emptyTrash, moveToTemp } from './scanner'
 
 function createWindow(): void {
   // Create the browser window.
@@ -57,6 +57,9 @@ app.whenReady().then(() => {
   ipcMain.handle('snooze-file', async (_, filePath) => await snoozeFile(filePath))
   ipcMain.handle('move-to-trash', async (_, filePath) => {
     await moveToTrash(filePath)
+  })
+  ipcMain.handle('move-to-temp', async (_, filePath) => {
+    await moveToTemp(filePath)
   })
   ipcMain.handle('empty-trash', async () => {
     await emptyTrash()
