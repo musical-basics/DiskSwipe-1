@@ -1,4 +1,4 @@
-import { app, shell, BrowserWindow, ipcMain } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, nativeImage } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
@@ -60,6 +60,17 @@ app.whenReady().then(() => {
   })
   ipcMain.handle('empty-trash', async () => {
     await emptyTrash()
+  })
+  ipcMain.handle('get-file-thumbnail', async (_, filePath) => {
+    try {
+      const image = await nativeImage.createThumbnailFromPath(filePath, { width: 400, height: 400 })
+      return image.toDataURL()
+    } catch {
+      return null
+    }
+  })
+  ipcMain.handle('open-file', async (_, filePath) => {
+    await shell.openPath(filePath)
   })
 
   createWindow()

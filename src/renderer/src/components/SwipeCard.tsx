@@ -1,5 +1,5 @@
 import { motion, useAnimation, useMotionValue, useTransform, PanInfo } from 'framer-motion'
-import { HardDrive } from 'lucide-react'
+import { HardDrive, Play } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
 interface ScannedFile {
@@ -21,6 +21,7 @@ export function SwipeCard({ file, onSwipeLeft, onSwipeRight, onKeep }: SwipeCard
   const x = useMotionValue(0)
   const controls = useAnimation()
   const [isAnimatingOut, setIsAnimatingOut] = useState(false)
+  const [thumbnail, setThumbnail] = useState<string | null>(null)
 
   const rotate = useTransform(x, [-200, 200], [-10, 10])
   const opacity = useTransform(x, [-200, -100, 0, 100, 200], [0, 1, 1, 1, 0])
@@ -29,6 +30,15 @@ export function SwipeCard({ file, onSwipeLeft, onSwipeRight, onKeep }: SwipeCard
     [-200, 0, 200],
     ['rgba(239,68,68,0.2)', 'rgba(31,41,55,1)', 'rgba(34,197,94,0.2)']
   )
+
+  useEffect(() => {
+    let isMounted = true
+    setThumbnail(null)
+    window.api.getFileThumbnail(file.path).then((dataUrl) => {
+      if (isMounted && dataUrl) setThumbnail(dataUrl)
+    })
+    return () => { isMounted = false }
+  }, [file])
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -71,6 +81,9 @@ export function SwipeCard({ file, onSwipeLeft, onSwipeRight, onKeep }: SwipeCard
     }
   }
 
+  const isVideo = ['mov', 'mp4', 'mkv', 'avi', 'webm'].includes(file.type.toLowerCase())
+  const dateStr = new Date(file.modifyTime).toLocaleDateString()
+
   return (
     <motion.div
       drag="x"
@@ -81,14 +94,32 @@ export function SwipeCard({ file, onSwipeLeft, onSwipeRight, onKeep }: SwipeCard
       initial={{ scale: 0.95, opacity: 0, x: 0, y: 0 }}
       className="border border-gray-700 w-full h-full rounded-2xl flex flex-col items-center justify-center p-8 shadow-2xl absolute inset-0 cursor-grab active:cursor-grabbing hover:shadow-blue-500/10 origin-bottom"
     >
-      <HardDrive className="w-20 h-20 text-gray-500 mb-6 pointer-events-none" />
+      {thumbnail ? (
+        <div className="relative w-48 h-48 mb-6 rounded-lg overflow-hidden shrink-0 shadow-xl border border-gray-700/50 bg-black">
+          <img src={thumbnail} className="object-cover w-full h-full pointer-events-none" />
+          {isVideo && (
+            <button 
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={() => window.api.openFile(file.path)}
+              className="absolute inset-0 m-auto w-14 h-14 bg-black/60 hover:bg-black/80 rounded-full flex items-center justify-center backdrop-blur-sm transition-all shadow-lg cursor-pointer hover:scale-105"
+            >
+              <Play className="w-6 h-6 text-white ml-1 pointer-events-none" />
+            </button>
+          )}
+        </div>
+      ) : (
+        <HardDrive className="w-20 h-20 text-gray-500 mb-6 pointer-events-none" />
+      )}
+
       <h3 className="text-xl font-bold text-center break-all line-clamp-3 px-4 pointer-events-none">
         {file.name}
       </h3>
       <p className="text-blue-400 font-mono mt-4 text-2xl pointer-events-none">
         {(file.size / 1024 / 1024).toFixed(1)} MB
       </p>
-      <p className="text-gray-500 mt-2 text-sm uppercase pointer-events-none">{file.type}</p>
+      <p className="text-gray-500 mt-2 text-sm uppercase pointer-events-none tracking-widest">
+        {file.type} &bull; {dateStr}
+      </p>
     </motion.div>
   )
 }

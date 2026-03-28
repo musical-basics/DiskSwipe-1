@@ -129,15 +129,15 @@ export default function App() {
           <div className="flex justify-between w-full mt-10 px-4">
             <div className="flex flex-col items-center text-red-400">
               <Trash2 className="w-8 h-8 mb-2" />
-              <span className="text-xs font-bold uppercase">Swipe Left</span>
+              <span className="text-xs font-bold uppercase tracking-widest">Delete</span>
             </div>
             <div className="flex flex-col items-center text-yellow-500">
               <Sparkles className="w-8 h-8 mb-2" />
-              <span className="text-xs font-bold uppercase">Click Star</span>
+              <span className="text-xs font-bold uppercase tracking-widest">Keep Forever</span>
             </div>
             <div className="flex flex-col items-center text-green-400">
               <RefreshCw className="w-8 h-8 mb-2" />
-              <span className="text-xs font-bold uppercase">Swipe Right</span>
+              <span className="text-xs font-bold uppercase tracking-widest">Think About It</span>
             </div>
           </div>
         </div>
